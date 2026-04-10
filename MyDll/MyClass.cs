@@ -92,7 +92,8 @@ namespace MyDll
             if (value is List<int> list_int) return string.Join(",", list_int);
             if (value is List<string> list_str) return string.Join(",", list_str);
             if (value is string str) return str;
-            if (value is List<List<int>> list_rect) return string.Join(",", list_rect.Select(r => string.Join("_", r)));
+            if (value is List<List<int>> list_list_int) return string.Join(",", list_list_int.Select(r => string.Join("_", r)));
+            if (value is List<Rectangle> list_rect) return string.Join(",", list_rect.Select(r => $"{r.Left}_{r.Top}_{r.Right}_{r.Bottom}"));
             return value.ToString();
         }
 
@@ -104,11 +105,12 @@ namespace MyDll
             if (targetType == typeof(List<string>)) return string.IsNullOrEmpty(value) ? new List<string>() : value.Split(',').ToList();
             if (targetType == typeof(List<List<int>>)) return string.IsNullOrEmpty(value) ? new List<List<int>>()
                     : value.Split(',').Select(val => { return val.Split('_').Select(int.Parse).ToList(); }).ToList();
-            //if (targetType == typeof(List<Rectangle>)) return string.IsNullOrEmpty(value) ? new List<Rectangle>()  // 如果字符串为空，返回空List
-            //        : value.Split(',').Select(val =>
-            //        {
-            //            var parts = val.Split('_');  // 将字符串按逗号分割
-            //            return Rectangle.FromLTRB(int.Parse(parts[0]), int.Parse(parts[1]), int.Parse(parts[2]), int.Parse(parts[3]));  // 创建Rectangle对象并返回                                                                                                  //        }).ToList();  // 返回List<Rectangle>
+            if (targetType == typeof(List<Rectangle>)) return string.IsNullOrEmpty(value) ? new List<Rectangle>()
+                    : value.Split(',').Select(val =>
+                    {
+                        var parts = val.Split('_');
+                        return Rectangle.FromLTRB(int.Parse(parts[0]), int.Parse(parts[1]), int.Parse(parts[2]), int.Parse(parts[3]));
+                    }).ToList();
             throw new NotSupportedException($"Type {targetType} not supported");
         }
         #endregion
@@ -420,7 +422,7 @@ namespace MyDll
 
             private void ValidateType()
             {
-                var validTypes = new[] { typeof(int), typeof(string), typeof(List<int>), typeof(List<string>), typeof(List<List<int>>) };
+                var validTypes = new[] { typeof(int), typeof(string), typeof(List<int>), typeof(List<string>), typeof(List<List<int>>), typeof(List<Rectangle>) };
                 if (!validTypes.Contains(ValueType))
                     throw new ArgumentException($"Invalid parameter type: {ValueType}");
             }

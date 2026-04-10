@@ -530,6 +530,28 @@ namespace MyDll {
         /// 请求超时时返回内部哨兵 <see cref="_timeoutMarker"/>（供重试方法判断）；
         /// 其他异常返回 "Exception: ..." 字符串。
         /// </returns>
+        /// <summary>
+        /// 递归检查异常链中是否包含超时类异常：
+        /// TaskCanceledException / OperationCanceledException（HttpClient 超时取消）、
+        /// WebException.Status == Timeout 或 RequestCanceled（网络层超时）、
+        /// SocketException.SocketErrorCode == TimedOut（Socket 层超时）。
+        /// </summary>
+        private static bool IsTimeoutException(Exception ex) {
+            if (ex == null) return false;
+            if (ex is TaskCanceledException || ex is OperationCanceledException) return true;
+            if (ex is System.Net.WebException we &&
+                (we.Status == System.Net.WebExceptionStatus.Timeout ||
+                 we.Status == System.Net.WebExceptionStatus.RequestCanceled)) return true;
+            if (ex is System.Net.Sockets.SocketException se &&
+                se.SocketErrorCode == System.Net.Sockets.SocketError.TimedOut) return true;
+            if (ex is AggregateException ae) {
+                foreach (var inner in ae.Flatten().InnerExceptions)
+                    if (IsTimeoutException(inner)) return true;
+                return false;
+            }
+            return IsTimeoutException(ex.InnerException);
+        }
+
         private static string TryPostOnce(string apiUrl, string json) {
             try {
                 using (var httpClient = new HttpClient()) {
@@ -546,12 +568,15 @@ namespace MyDll {
                     return $"Error: {response.StatusCode}, Reason: {response.ReasonPhrase}";
                 }
             }
-            catch (TaskCanceledException) {
-                // 仅超时返回哨兵，由调用方决定是否重试
-                return _timeoutMarker;
-            }
             catch (Exception ex) {
-                return $"Exception: {ex.Message}";
+                // .Result 会将异常包装进 AggregateException，需递归检查是否为超时。
+                if (IsTimeoutException(ex))
+                    return _timeoutMarker;  // 超时 → 由调用方决定是否重试
+
+                Exception report = ex is AggregateException ae
+                    ? (ae.Flatten().InnerException ?? ex)
+                    : ex;
+                return $"Exception: {report.Message}";
             }
         }
 
