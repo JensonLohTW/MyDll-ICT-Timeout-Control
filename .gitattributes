@@ -1,0 +1,20 @@
+# 自动检测文本文件并规范化行尾
+* text=auto
+
+# C# 源码文件使用 CRLF（Windows 标准）
+*.cs     text eol=crlf
+*.csproj text eol=crlf
+*.sln    text eol=crlf
+*.config text eol=crlf
+*.xml    text eol=crlf
+*.json   text eol=crlf
+*.md     text eol=lf
+
+# 二进制文件不处理行尾
+*.png    binary
+*.jpg    binary
+*.gif    binary
+*.ico    binary
+*.dll    binary
+*.exe    binary
+*.pdb    binary
