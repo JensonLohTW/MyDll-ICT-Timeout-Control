@@ -501,5 +501,180 @@ namespace MyDll {
                     $"Timeout Error: Request timed out after {_requestTimeout.TotalSeconds} seconds. Details: {ex.Message}";
             }
         }
+
+
+        /******************************************** 超时自动重传（最多3次）*********************************************************/
+
+        // 内部哨兵值：标识单次请求发生了超时，不对外暴露
+        private const string _timeoutMarker = "\x00TIMEOUT\x00";
+
+        /// <summary>
+        /// 执行单次 HTTP POST JSON 请求，区分"超时"与"其他结果"。
+        /// </summary>
+        /// <param name="apiUrl">目标接口地址。</param>
+        /// <param name="json">已序列化的请求体 JSON 字符串。</param>
+        /// <returns>
+        /// 请求成功时返回 "Success: ..." 字符串；
+        /// 服务端返回错误时返回 "Error: ..." 字符串；
+        /// 请求超时时返回内部哨兵 <see cref="_timeoutMarker"/>（供重试方法判断）；
+        /// 其他异常返回 "Exception: ..." 字符串。
+        /// </returns>
+        private static string TryPostOnce(string apiUrl, string json) {
+            try {
+                using (var httpClient = new HttpClient()) {
+                    httpClient.Timeout = _requestTimeout;
+                    httpClient.DefaultRequestHeaders.Accept.Add(
+                        new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+
+                    var content = new StringContent(json, Encoding.UTF8, "application/json");
+                    HttpResponseMessage response = httpClient.PostAsync(apiUrl, content).Result;
+
+                    if (response.IsSuccessStatusCode) {
+                        return $"Success: {response.StatusCode}, Response: {response.Content.ReadAsStringAsync().Result}";
+                    }
+                    return $"Error: {response.StatusCode}, Reason: {response.ReasonPhrase}";
+                }
+            }
+            catch (TaskCanceledException) {
+                // 仅超时返回哨兵，由调用方决定是否重试
+                return _timeoutMarker;
+            }
+            catch (Exception ex) {
+                return $"Exception: {ex.Message}";
+            }
+        }
+
+        /// <summary>
+        /// 带超时自动重传的 SN_CheckOut 请求。
+        /// 当请求超时时自动重试，总尝试次数最多 3 次（第 1 次 + 最多 2 次重试）。
+        /// 任意一次成功则立即返回，不再继续重试；
+        /// 3 次全部超时则返回明确的超时失败信息。
+        /// 非超时的服务端错误或其他异常不重试，直接返回。
+        /// </summary>
+        /// <param name="Line">产线编号。</param>
+        /// <param name="StationID">站点 ID。</param>
+        /// <param name="MachineID">设备 ID。</param>
+        /// <param name="Mold">治具编号。</param>
+        /// <param name="OPID">操作人员 ID。</param>
+        /// <param name="TOKen">认证 Token。</param>
+        /// <param name="FixSN">修复序列号。</param>
+        /// <param name="apiUrl">MES 系统 API 地址。</param>
+        /// <param name="sn">序列号。</param>
+        /// <param name="result">检测结果（PASS / FAIL）。</param>
+        /// <param name="errCode">错误代码。</param>
+        /// <param name="dcInfoList">DC 信息列表。</param>
+        /// <param name="compList">组件列表。</param>
+        /// <returns>
+        /// 成功时返回 "Success: ..." 字符串；
+        /// 服务端错误返回 "Error: ..." 字符串；
+        /// 3 次全部超时返回 "Timeout Error: All 3 attempts timed out after Xs each."；
+        /// 其他异常返回 "Exception: ..." 字符串。
+        /// </returns>
+        /// <remarks>
+        /// 重试策略：最多 3 次，仅在 <see cref="TaskCanceledException"/>（超时）时重试。
+        /// 超时阈值复用 <see cref="_requestTimeout"/>（当前 5 秒）。
+        /// </remarks>
+        public static string SN_CheckOutRequest_WithRetry(
+            string Line, string StationID, string MachineID, string Mold, string OPID,
+            string TOKen, string FixSN,
+            string apiUrl, string sn, string result, string errCode,
+            List<DcInfoItem> dcInfoList, List<CompListItem> compList) {
+
+            var uploadData = new SnCheckOutModel {
+                EventID    = "SN_CheckOut",
+                Line       = Line,
+                StationID  = StationID,
+                MachineID  = MachineID,
+                Mold       = Mold,
+                OPID       = OPID,
+                TOKen      = TOKen,
+                FixSN      = FixSN,
+                SNInfo     = new List<SnInfoItem> {
+                    new SnInfoItem {
+                        SN       = sn,
+                        Result   = result,
+                        ErrCode  = errCode,
+                        DC_Info  = dcInfoList,
+                        CompList = compList
+                    }
+                },
+                SendTime = DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss")
+            };
+
+            string json = JsonConvert.SerializeObject(uploadData, Formatting.Indented);
+
+            const int maxAttempts = 3;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+                string response = TryPostOnce(apiUrl, json);
+                if (response != _timeoutMarker)
+                    return response;
+                // 超时：更新 SendTime 后继续重试
+                uploadData.SendTime = DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss");
+                json = JsonConvert.SerializeObject(uploadData, Formatting.Indented);
+            }
+
+            return $"Timeout Error: All {maxAttempts} attempts timed out after {_requestTimeout.TotalSeconds}s each.";
+        }
+
+        /// <summary>
+        /// 带超时自动重传的 SN_FileUpload 请求。
+        /// 当请求超时时自动重试，总尝试次数最多 3 次（第 1 次 + 最多 2 次重试）。
+        /// 任意一次成功则立即返回，不再继续重试；
+        /// 3 次全部超时则返回明确的超时失败信息。
+        /// 非超时的服务端错误或其他异常不重试，直接返回。
+        /// </summary>
+        /// <param name="Line">产线编号。</param>
+        /// <param name="StationID">站点 ID。</param>
+        /// <param name="MachineID">设备 ID。</param>
+        /// <param name="OPID">操作人员 ID。</param>
+        /// <param name="sn">序列号。</param>
+        /// <param name="FileName">上传文件名。</param>
+        /// <param name="FilePath">上传文件路径（MES 可访问的路径）。</param>
+        /// <param name="apiUrl">MES 系统 API 地址。</param>
+        /// <returns>
+        /// 成功时返回 "Success: ..." 字符串；
+        /// 服务端错误返回 "Error: ..." 字符串；
+        /// 3 次全部超时返回 "Timeout Error: All 3 attempts timed out after Xs each."；
+        /// 其他异常返回 "Exception: ..." 字符串。
+        /// </returns>
+        /// <remarks>
+        /// 重试策略：最多 3 次，仅在 <see cref="TaskCanceledException"/>（超时）时重试。
+        /// 超时阈值复用 <see cref="_requestTimeout"/>（当前 5 秒）。
+        /// </remarks>
+        public static string SN_FileUploadRequest_WithRetry(
+            string Line, string StationID, string MachineID, string OPID,
+            string sn, string FileName, string FilePath, string apiUrl) {
+
+            var uploadData = new SnFileUploadModel {
+                EventID   = "SN_FileUpload",
+                Line      = Line,
+                StationID = StationID,
+                MachineID = MachineID,
+                OPID      = OPID,
+                SNList    = new List<SNList> {
+                    new SNList {
+                        SN       = sn,
+                        FileInfo = new List<FileInfo> {
+                            new FileInfo { FileName = FileName, FilePath = FilePath }
+                        }
+                    }
+                },
+                SendTime = DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss")
+            };
+
+            string json = JsonConvert.SerializeObject(uploadData, Formatting.Indented);
+
+            const int maxAttempts = 3;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+                string response = TryPostOnce(apiUrl, json);
+                if (response != _timeoutMarker)
+                    return response;
+                // 超时：更新 SendTime 后继续重试
+                uploadData.SendTime = DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss");
+                json = JsonConvert.SerializeObject(uploadData, Formatting.Indented);
+            }
+
+            return $"Timeout Error: All {maxAttempts} attempts timed out after {_requestTimeout.TotalSeconds}s each.";
+        }
     }
 }
