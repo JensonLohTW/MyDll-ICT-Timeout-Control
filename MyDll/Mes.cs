@@ -79,6 +79,17 @@ namespace MyDll {
     }
 
     public class MesClass {
+        private static string _failedImageRootPath =
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FailedImages");
+
+        /// <summary>
+        /// 失败图片归档根目录。调用方可在上传前设置该路径，例如 MesClass.FailedImageRootPath = @"D:\FailedImages"。
+        /// </summary>
+        public static string FailedImageRootPath {
+            get { return _failedImageRootPath; }
+            set { _failedImageRootPath = value; }
+        }
+
         /// <summary>
         /// 发送SN文件上传请求到MES系统
         /// </summary>
@@ -544,6 +555,27 @@ namespace MyDll {
             }
         }
 
+        private static void ArchiveFileUploadFailure(
+            string sourceImagePath,
+            string sn,
+            int retryCount,
+            string errorMessage,
+            string apiUrl) {
+
+            try {
+                var failedImageArchiveService = new FailedImageArchiveService(FailedImageRootPath);
+                failedImageArchiveService.ArchiveAfterMaxRetries(
+                    sourceImagePath,
+                    sn,
+                    retryCount,
+                    errorMessage,
+                    apiUrl);
+            }
+            catch {
+                // 失败图片归档不能影响上传接口的原有返回流程。
+            }
+        }
+
         /// <summary>
         /// 带超时自动重传的 SN_CheckOut 请求。
         /// 当请求超时时自动重试，总尝试次数最多 3 次（第 1 次 + 最多 2 次重试）。
@@ -674,7 +706,10 @@ namespace MyDll {
                 json = JsonConvert.SerializeObject(uploadData, Formatting.Indented);
             }
 
-            return $"Timeout Error: All {maxAttempts} attempts timed out after {_requestTimeout.TotalSeconds}s each.";
+            string finalErrorMessage =
+                $"Timeout Error: All {maxAttempts} attempts timed out after {_requestTimeout.TotalSeconds}s each.";
+            ArchiveFileUploadFailure(FilePath, sn, maxAttempts, finalErrorMessage, apiUrl);
+            return finalErrorMessage;
         }
     }
 }
