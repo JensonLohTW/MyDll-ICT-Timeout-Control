@@ -289,4 +289,66 @@ ApiUrl:            http://192.168.1.100/mes/api/fileupload
 
 ---
 
-*文件對應版本：commit `3364c1e` — 2026-04-10*
+## 8. 現場端（上位機）實作整合指南與代碼範本
+
+為了確保現場機台的穩定性（即使遇到廠區網路斷線也不會使停機台卡站），請現場負責人直接複製以下的「最佳實踐架構」到上位機程式中：
+
+### 步驟一：設定安全歸檔目錄（全域執行一次）
+在機台主程式（例如 `Form1_Load` 或是 `Program.cs`）的啟動處，定義一個本機的安全路徑。
+
+```csharp
+// 【程式啟動時設定】建議設定在主控電腦空間充足且非系統槽的獨立硬碟目錄
+MyDll.MesClass.FailedImageRootPath = @"D:\MES_FailedImages_Archive";
+```
+
+### 步驟二：測試完成站點的防呆處理框架
+當單一個產品測試完成，呼叫上傳圖片邏輯時，請套用此判斷邏輯，確保「非致命異常」不會阻斷產線：
+
+```csharp
+// 1. 準備呼叫參數
+string currentSn = "CCAE173002551";
+string imageFileName = "ResultImage.jpg";
+string imageFullPath = @"C:\TestImages\ResultImage.jpg"; // 本機產生的圖片路徑
+
+// 2. 呼叫底層防護上傳方法 (自動含三次重傳防護)
+string response = MyDll.MesClass.SN_FileUploadRequest_WithRetry(
+    Line: "F-PA-02",
+    StationID: "OQC_AVI",
+    MachineID: "F-02-M9-AV-01",
+    OPID: "12280738",
+    sn: currentSn,
+    FileName: imageFileName,
+    FilePath: imageFullPath,
+    apiUrl: "https://your-mes-server.com/api/upload"
+);
+
+// 3. 處理回傳字串（影響產線是否繼續的關鍵）
+if (response.StartsWith("Success"))
+{
+    // 【✅ 情況 A：上傳成功】
+    // 流程正常，亮綠燈或記錄成功日誌
+    Log("MES資料與圖片完整上傳成功。");
+}
+else if (response.StartsWith("Timeout Error"))
+{
+    // 【⚠️ 情況 B：網路超時且重傳3次皆失敗】
+    // 重點：DLL已經默默幫你在 D:\MES_FailedImages_Archive 建立副本了！
+    // 處置：只需記錄日誌，接著讓程式「直接放行」，機台繼續測試下一個零件，千萬別拋出阻塞提示框！
+    Log($"【警告】MES網路異常放棄上傳，圖片已自動本地歸檔。條碼：{currentSn}");
+    
+    // -> DO NOT STOP 機台，讓輸送帶繼續
+}
+else
+{
+    // 【❌ 情況 C：系統服務異常 (網址錯、MES回應500等)】
+    // 此類非網路延遲問題，表示設定錯誤或MES端觸發防呆！
+    // 處置：考慮跳出警報暫停產線，通知 IT 或生管人員確認。
+    Log("發生嚴重致命錯誤：" + response);
+    
+    // -> 這裡可視業務需求決定是否中斷測試
+}
+```
+
+---
+
+*文件對應版本：commit `3364c1e` — 最新超時與實作框架增強版*
