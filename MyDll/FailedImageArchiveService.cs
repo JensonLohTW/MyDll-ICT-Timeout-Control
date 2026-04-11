@@ -30,7 +30,6 @@ namespace MyDll {
             int retryCount,
             string errorMessage,
             string apiUrl) {
-
             DateTime failedTime = DateTime.Now;
             string dayText = failedTime.ToString("yyyyMMdd");
             string dayDirectory = Path.Combine(_failedImageRootPath, dayText);
@@ -120,7 +119,6 @@ namespace MyDll {
             int retryCount,
             string errorMessage,
             string apiUrl) {
-
             try {
                 Directory.CreateDirectory(dayDirectory);
                 string dayText = failedTime.ToString("yyyyMMdd");
@@ -151,7 +149,6 @@ namespace MyDll {
             int retryCount,
             string errorMessage,
             string apiUrl) {
-
             var builder = new StringBuilder();
             builder.AppendLine("------------------------------------------------------------");
             builder.AppendLine("FailedTime: " + failedTime.ToString("yyyy-MM-dd HH:mm:ss.fff"));

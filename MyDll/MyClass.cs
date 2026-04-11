@@ -17,13 +17,13 @@ using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace MyDll
-{
-    public sealed class ParameterManager
-    {
+namespace MyDll {
+    public sealed class ParameterManager {
         #region INI Helpers
+
         [DllImport("kernel32")]
-        private static extern int GetPrivateProfileString(string section, string key, string def, StringBuilder retVal, int size, string filePath);
+        private static extern int GetPrivateProfileString(string section, string key, string def, StringBuilder retVal,
+            int size, string filePath);
 
         [DllImport("kernel32")]
         private static extern long WritePrivateProfileString(string section, string key, string val, string filePath);
@@ -33,10 +33,10 @@ namespace MyDll
         private static extern int GetPrivateProfileSectionNames(byte[] lpszReturnBuffer, int nSize, string lpFileName);
 
         [DllImport("kernel32")]
-        private static extern int GetPrivateProfileSection(string lpAppName, byte[] lpReturnedString, int nSize, string lpFileName);
+        private static extern int GetPrivateProfileSection(string lpAppName, byte[] lpReturnedString, int nSize,
+            string lpFileName);
 
-        private List<string> GetSectionNames(string filePath)
-        {
+        private List<string> GetSectionNames(string filePath) {
             byte[] buffer = new byte[32768];
             int bytesRead = GetPrivateProfileSectionNames(buffer, buffer.Length, filePath) * sizeof(char);
             //Console.WriteLine("sec bytesRead : " + bytesRead.ToString() + ", " + Encoding.Default.GetString(buffer, 0, bytesRead));
@@ -46,8 +46,7 @@ namespace MyDll
                 .ToList();
         }
 
-        private List<string> GetKeys(string filePath, string section)
-        {
+        private List<string> GetKeys(string filePath, string section) {
             byte[] buffer = new byte[32768];
             int bytesRead = GetPrivateProfileSection(section, buffer, buffer.Length, filePath) * sizeof(char);
             //Console.WriteLine("key bytesRead : " + bytesRead.ToString() + ", " + Encoding.Default.GetString(buffer, 0, bytesRead));
@@ -58,91 +57,96 @@ namespace MyDll
                 .ToList();
         }
 
-        private string ReadValue(string section, string key, string filePath)
-        {
+        private string ReadValue(string section, string key, string filePath) {
             StringBuilder sb = new StringBuilder(65535);
             GetPrivateProfileString(section, key, "", sb, sb.Capacity, filePath);
             return sb.ToString();
         }
 
-        private void WriteValue(string section, string key, string value, string filePath)
-        {
+        private void WriteValue(string section, string key, string value, string filePath) {
             WritePrivateProfileString(section, key, value, filePath);
         }
 
-        private object ReadValueFromIni(string section, string key, Type type)
-        {
-            try
-            {
+        private object ReadValueFromIni(string section, string key, Type type) {
+            try {
                 return ConvertStringToType(ReadValue(section, key, _iniFilePath), type);
             }
-            catch
-            {
+            catch {
                 return null;
             }
         }
 
-        private void WriteValueToIni(string section, string key, object value)
-        {
+        private void WriteValueToIni(string section, string key, object value) {
             WriteValue(section, key, ConvertTypeToString(value), _iniFilePath);
         }
 
-        private string ConvertTypeToString(object value)
-        {
+        private string ConvertTypeToString(object value) {
             if (value is List<int> list_int) return string.Join(",", list_int);
             if (value is List<string> list_str) return string.Join(",", list_str);
             if (value is string str) return str;
-            if (value is List<List<int>> list_list_int) return string.Join(",", list_list_int.Select(r => string.Join("_", r)));
-            if (value is List<Rectangle> list_rect) return string.Join(",", list_rect.Select(r => $"{r.Left}_{r.Top}_{r.Right}_{r.Bottom}"));
+            if (value is List<List<int>> list_list_int)
+                return string.Join(",", list_list_int.Select(r => string.Join("_", r)));
+            if (value is List<Rectangle> list_rect)
+                return string.Join(",", list_rect.Select(r => $"{r.Left}_{r.Top}_{r.Right}_{r.Bottom}"));
             return value.ToString();
         }
 
-        private object ConvertStringToType(string value, Type targetType)
-        {
+        private object ConvertStringToType(string value, Type targetType) {
             if (targetType == typeof(int)) return int.Parse(value);
             if (targetType == typeof(string)) return value;
-            if (targetType == typeof(List<int>)) return string.IsNullOrEmpty(value) ? new List<int>() : value.Split(',').Select(int.Parse).ToList();
-            if (targetType == typeof(List<string>)) return string.IsNullOrEmpty(value) ? new List<string>() : value.Split(',').ToList();
-            if (targetType == typeof(List<List<int>>)) return string.IsNullOrEmpty(value) ? new List<List<int>>()
+            if (targetType == typeof(List<int>))
+                return string.IsNullOrEmpty(value) ? new List<int>() : value.Split(',').Select(int.Parse).ToList();
+            if (targetType == typeof(List<string>))
+                return string.IsNullOrEmpty(value) ? new List<string>() : value.Split(',').ToList();
+            if (targetType == typeof(List<List<int>>))
+                return string.IsNullOrEmpty(value)
+                    ? new List<List<int>>()
                     : value.Split(',').Select(val => { return val.Split('_').Select(int.Parse).ToList(); }).ToList();
-            if (targetType == typeof(List<Rectangle>)) return string.IsNullOrEmpty(value) ? new List<Rectangle>()
-                    : value.Split(',').Select(val =>
-                    {
+            if (targetType == typeof(List<Rectangle>))
+                return string.IsNullOrEmpty(value)
+                    ? new List<Rectangle>()
+                    : value.Split(',').Select(val => {
                         var parts = val.Split('_');
-                        return Rectangle.FromLTRB(int.Parse(parts[0]), int.Parse(parts[1]), int.Parse(parts[2]), int.Parse(parts[3]));
+                        return Rectangle.FromLTRB(int.Parse(parts[0]), int.Parse(parts[1]), int.Parse(parts[2]),
+                            int.Parse(parts[3]));
                     }).ToList();
             throw new NotSupportedException($"Type {targetType} not supported");
         }
+
         #endregion
 
         #region Singleton Implementation
-        private static readonly Lazy<ParameterManager> _instance = new Lazy<ParameterManager>(() => new ParameterManager());
+
+        private static readonly Lazy<ParameterManager> _instance =
+            new Lazy<ParameterManager>(() => new ParameterManager());
+
         public static ParameterManager Instance => _instance.Value;
-        private ParameterManager() { }
+
+        private ParameterManager() {
+        }
+
         #endregion
 
-        private readonly Dictionary<string, Dictionary<string, object>> _parameterCache = 
+        private readonly Dictionary<string, Dictionary<string, object>> _parameterCache =
             new Dictionary<string, Dictionary<string, object>>(StringComparer.OrdinalIgnoreCase);
+
         //private bool _isInitialized;
         private string _iniFilePath;
         private readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
 
         #region Initialize
-        public void Initialize(string iniFilePath, List<ParameterDefinition> defaultParams)
-        {
+
+        public void Initialize(string iniFilePath, List<ParameterDefinition> defaultParams) {
             _lock.EnterWriteLock();
 
-            try
-            {
+            try {
                 _iniFilePath = iniFilePath;
                 var directory = Path.GetDirectoryName(iniFilePath);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-                {
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory)) {
                     Directory.CreateDirectory(directory);
                 }
 
-                if (File.Exists(iniFilePath))
-                {
+                if (File.Exists(iniFilePath)) {
                     var existingParams = ReadAllParameters(iniFilePath);
                     //Console.WriteLine(existingParams.Count.ToString());
                     //foreach (var section in existingParams)
@@ -154,35 +158,29 @@ namespace MyDll
                     //    }
                     //}
 
-                    if (!ValidateStructure(existingParams, defaultParams))
-                    {
+                    if (!ValidateStructure(existingParams, defaultParams)) {
                         BackupAndCreateNew(iniFilePath, existingParams, defaultParams);
                     }
                 }
-                else
-                {
+                else {
                     CreateIniFile(iniFilePath, defaultParams);
                 }
 
                 LoadParameters(iniFilePath, defaultParams);
             }
-            finally
-            {
+            finally {
                 _lock.ExitWriteLock();
             }
         }
 
-        private void LoadParameters(string filePath, List<ParameterDefinition> defaultParams)
-        {
+        private void LoadParameters(string filePath, List<ParameterDefinition> defaultParams) {
             var defaultSections = defaultParams.Select(x => x.Section).Distinct().ToList();
 
-            foreach (var section in defaultSections)
-            {
+            foreach (var section in defaultSections) {
                 var sectionDict = new Dictionary<string, object>(
                     StringComparer.OrdinalIgnoreCase);
 
-                foreach (var param in defaultParams.Where(x => x.Section == section))
-                {
+                foreach (var param in defaultParams.Where(x => x.Section == section)) {
                     var valueStr = ReadValue(param.Section, param.Key, filePath);
                     sectionDict[param.Key] = ConvertStringToType(valueStr, param.ValueType);
                 }
@@ -191,19 +189,16 @@ namespace MyDll
             }
         }
 
-        private Dictionary<string, Dictionary<string, string>> ReadAllParameters(string filePath)
-        {
+        private Dictionary<string, Dictionary<string, string>> ReadAllParameters(string filePath) {
             var parameters = new Dictionary<string, Dictionary<string, string>>();
 
             var sections = GetSectionNames(filePath);
 
-            foreach (var section in sections)
-            {
+            foreach (var section in sections) {
                 var sectionDict = new Dictionary<string, string>();
                 var keys = GetKeys(filePath, section);
 
-                foreach (var key in keys)
-                {
+                foreach (var key in keys) {
                     sectionDict[key] = ReadValue(section, key, filePath);
                 }
 
@@ -232,28 +227,23 @@ namespace MyDll
 
         private bool ValidateStructure(
             Dictionary<string, Dictionary<string, string>> existingParams,
-            List<ParameterDefinition> defaultParams)
-        {
-            foreach (var param in defaultParams)
-            {
+            List<ParameterDefinition> defaultParams) {
+            foreach (var param in defaultParams) {
                 if (!existingParams.ContainsKey(param.Section) ||
-                    !existingParams[param.Section].ContainsKey(param.Key))
-                {
+                    !existingParams[param.Section].ContainsKey(param.Key)) {
                     return false;
                 }
             }
+
             return true;
         }
 
         private bool CompareCollections(IEnumerable<string> col1,
-            IEnumerable<string> col2, bool ignoreCase)
-        {
-            var comparer = ignoreCase ?
-                StringComparer.OrdinalIgnoreCase :
-                StringComparer.Ordinal;
+            IEnumerable<string> col2, bool ignoreCase) {
+            var comparer = ignoreCase ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
             return col1.OrderBy(x => x, comparer)
-                       .SequenceEqual(col2.OrderBy(x => x, comparer), comparer);
+                .SequenceEqual(col2.OrderBy(x => x, comparer), comparer);
         }
 
         //private void BackupAndCreateNew(string originalPath,
@@ -266,8 +256,7 @@ namespace MyDll
 
         private void BackupAndCreateNew(string originalPath,
             Dictionary<string, Dictionary<string, string>> existingParams,
-            List<ParameterDefinition> defaultParams)
-        {
+            List<ParameterDefinition> defaultParams) {
             // Backup original file
             var backupPath = $"{originalPath}.{DateTime.Now:yyyyMMddHHmmss}.bak";
             File.Move(originalPath, backupPath);
@@ -279,36 +268,33 @@ namespace MyDll
 
         private List<ParameterDefinition> MergeParameters(
             Dictionary<string, Dictionary<string, string>> existingParams,
-            List<ParameterDefinition> defaultParams)
-        {
+            List<ParameterDefinition> defaultParams) {
             var merged = new List<ParameterDefinition>(defaultParams);
-            for (int i=0; i < defaultParams.Count; i++)
-            {
+            for (int i = 0; i < defaultParams.Count; i++) {
                 var defaultParam = defaultParams[i];
                 if (existingParams.TryGetValue(defaultParam.Section, out var existingSection) &&
-                    existingSection.TryGetValue(defaultParam.Key, out var existingValue))
-                {
-                    try
-                    {
-                        merged[i] = new ParameterDefinition(defaultParam.Section, defaultParam.Key, ConvertStringToType(existingValue, defaultParam.ValueType));
+                    existingSection.TryGetValue(defaultParam.Key, out var existingValue)) {
+                    try {
+                        merged[i] = new ParameterDefinition(defaultParam.Section, defaultParam.Key,
+                            ConvertStringToType(existingValue, defaultParam.ValueType));
                     }
-                    catch
-                    {
-                        merged[i] = new ParameterDefinition(defaultParam.Section, defaultParam.Key, defaultParam.DefaultValue);
+                    catch {
+                        merged[i] = new ParameterDefinition(defaultParam.Section, defaultParam.Key,
+                            defaultParam.DefaultValue);
                     }
                 }
             }
+
             return merged;
         }
 
         private void CreateIniFile(string path,
-            List<ParameterDefinition> defaultParams)
-        {
-            foreach (var param in defaultParams)
-            {
+            List<ParameterDefinition> defaultParams) {
+            foreach (var param in defaultParams) {
                 WriteValue(param.Section, param.Key, ConvertTypeToString(param.DefaultValue), path);
             }
         }
+
         #endregion
 
         //private void SaveAllValues()
@@ -347,31 +333,26 @@ namespace MyDll
         //    _parameterCache[section][key] = value;
         //}
 
-        public T GetValue<T>(string section, string key)
-        {
+        public T GetValue<T>(string section, string key) {
             _lock.EnterReadLock();
-            try
-            {
-                if (_parameterCache.TryGetValue(section, out var sectionDict) && sectionDict.TryGetValue(key, out var value))
-                {
+            try {
+                if (_parameterCache.TryGetValue(section, out var sectionDict) &&
+                    sectionDict.TryGetValue(key, out var value)) {
                     return (T)value;
                 }
+
                 throw new KeyNotFoundException($"Parameter {section}.{key} not found");
             }
-            finally
-            {
+            finally {
                 _lock.ExitReadLock();
             }
         }
 
         // 参数设置窗口调用此方法更新参数
-        public void UpdateParameters(List<ParameterDefinition> newParameters)
-        {
+        public void UpdateParameters(List<ParameterDefinition> newParameters) {
             _lock.EnterWriteLock();
-            try
-            {
-                foreach (var kvp in newParameters)
-                {
+            try {
+                foreach (var kvp in newParameters) {
                     //if (!_parameterDefinitions.ContainsKey(kvp.Key)) continue;
 
                     //var definition = _parameterDefinitions[kvp.Key];
@@ -380,39 +361,33 @@ namespace MyDll
                     //_parameterCache[kvp.Key] = kvp.Value;
                 }
             }
-            finally
-            {
+            finally {
                 _lock.ExitWriteLock();
             }
         }
-        public void SetValue<T>(ParameterDefinition param, T value)
-        {
+
+        public void SetValue<T>(ParameterDefinition param, T value) {
             _lock.EnterWriteLock();
-            try
-            {
-                if (!_parameterCache.ContainsKey(param.Section))
-                {
+            try {
+                if (!_parameterCache.ContainsKey(param.Section)) {
                     _parameterCache[param.Section] = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
                 }
 
                 _parameterCache[param.Section][param.Key] = value;
                 WriteValueToIni(param.Section, param.Key, value);
             }
-            finally
-            {
+            finally {
                 _lock.ExitWriteLock();
             }
         }
 
-        public class ParameterDefinition
-        {
+        public class ParameterDefinition {
             public string Section { get; }
             public string Key { get; }
             public object DefaultValue { get; }
             public Type ValueType { get; }
 
-            public ParameterDefinition(string section, string key, object defaultValue)
-            {
+            public ParameterDefinition(string section, string key, object defaultValue) {
                 Section = section;
                 Key = key;
                 DefaultValue = defaultValue;
@@ -420,23 +395,20 @@ namespace MyDll
                 ValidateType();
             }
 
-            private void ValidateType()
-            {
-                var validTypes = new[] { typeof(int), typeof(string), typeof(List<int>), typeof(List<string>), typeof(List<List<int>>), typeof(List<Rectangle>) };
+            private void ValidateType() {
+                var validTypes = new[] {
+                    typeof(int), typeof(string), typeof(List<int>), typeof(List<string>), typeof(List<List<int>>),
+                    typeof(List<Rectangle>)
+                };
                 if (!validTypes.Contains(ValueType))
                     throw new ArgumentException($"Invalid parameter type: {ValueType}");
             }
         }
-
     }
 
-    public class MyClass
-    {
-        public static void Test()
-        {
+    public class MyClass {
+        public static void Test() {
             MessageBox.Show("调用成功666");
         }
-
-
-}
+    }
 }

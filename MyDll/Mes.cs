@@ -546,9 +546,11 @@ namespace MyDll {
                 se.SocketErrorCode == System.Net.Sockets.SocketError.TimedOut) return true;
             if (ex is AggregateException ae) {
                 foreach (var inner in ae.Flatten().InnerExceptions)
-                    if (IsTimeoutException(inner)) return true;
+                    if (IsTimeoutException(inner))
+                        return true;
                 return false;
             }
+
             return IsTimeoutException(ex.InnerException);
         }
 
@@ -563,15 +565,17 @@ namespace MyDll {
                     HttpResponseMessage response = httpClient.PostAsync(apiUrl, content).Result;
 
                     if (response.IsSuccessStatusCode) {
-                        return $"Success: {response.StatusCode}, Response: {response.Content.ReadAsStringAsync().Result}";
+                        return
+                            $"Success: {response.StatusCode}, Response: {response.Content.ReadAsStringAsync().Result}";
                     }
+
                     return $"Error: {response.StatusCode}, Reason: {response.ReasonPhrase}";
                 }
             }
             catch (Exception ex) {
                 // .Result 会将异常包装进 AggregateException，需递归检查是否为超时。
                 if (IsTimeoutException(ex))
-                    return _timeoutMarker;  // 超时 → 由调用方决定是否重试
+                    return _timeoutMarker; // 超时 → 由调用方决定是否重试
 
                 Exception report = ex is AggregateException ae
                     ? (ae.Flatten().InnerException ?? ex)
@@ -586,7 +590,6 @@ namespace MyDll {
             int retryCount,
             string errorMessage,
             string apiUrl) {
-
             try {
                 var failedImageArchiveService = new FailedImageArchiveService(FailedImageRootPath);
                 failedImageArchiveService.ArchiveAfterMaxRetries(
@@ -636,22 +639,21 @@ namespace MyDll {
             string TOKen, string FixSN,
             string apiUrl, string sn, string result, string errCode,
             List<DcInfoItem> dcInfoList, List<CompListItem> compList) {
-
             var uploadData = new SnCheckOutModel {
-                EventID    = "SN_CheckOut",
-                Line       = Line,
-                StationID  = StationID,
-                MachineID  = MachineID,
-                Mold       = Mold,
-                OPID       = OPID,
-                TOKen      = TOKen,
-                FixSN      = FixSN,
-                SNInfo     = new List<SnInfoItem> {
+                EventID = "SN_CheckOut",
+                Line = Line,
+                StationID = StationID,
+                MachineID = MachineID,
+                Mold = Mold,
+                OPID = OPID,
+                TOKen = TOKen,
+                FixSN = FixSN,
+                SNInfo = new List<SnInfoItem> {
                     new SnInfoItem {
-                        SN       = sn,
-                        Result   = result,
-                        ErrCode  = errCode,
-                        DC_Info  = dcInfoList,
+                        SN = sn,
+                        Result = result,
+                        ErrCode = errCode,
+                        DC_Info = dcInfoList,
                         CompList = compList
                     }
                 },
@@ -701,16 +703,15 @@ namespace MyDll {
         public static string SN_FileUploadRequest_WithRetry(
             string Line, string StationID, string MachineID, string OPID,
             string sn, string FileName, string FilePath, string apiUrl) {
-
             var uploadData = new SnFileUploadModel {
-                EventID   = "SN_FileUpload",
-                Line      = Line,
+                EventID = "SN_FileUpload",
+                Line = Line,
                 StationID = StationID,
                 MachineID = MachineID,
-                OPID      = OPID,
-                SNList    = new List<SNList> {
+                OPID = OPID,
+                SNList = new List<SNList> {
                     new SNList {
-                        SN       = sn,
+                        SN = sn,
                         FileInfo = new List<FileInfo> {
                             new FileInfo { FileName = FileName, FilePath = FilePath }
                         }
